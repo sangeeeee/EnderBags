@@ -1,0 +1,15 @@
+{
+  "type": "ender_bags:dye_ender_bag",
+  "group": "ender_bag_dyeing",
+  "ingredients": [
+    {
+      "item": "ender_bags:ender_bag"
+    },
+    {
+      "tag": "minecraft:dyes"
+    }
+  ],
+  "result": {
+    "item": "ender_bags:ender_bag"
+  }
+}
