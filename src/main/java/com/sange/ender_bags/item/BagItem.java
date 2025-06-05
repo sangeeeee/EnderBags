@@ -1,8 +1,12 @@
 package com.sange.ender_bags.item;
 
 import com.sange.ender_bags.container.EnderBagMenu;
+import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -14,10 +18,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 
 
 public class BagItem extends Item implements MenuProvider {
@@ -52,6 +58,35 @@ public class BagItem extends Item implements MenuProvider {
             return InteractionResultHolder.success(player.getItemInHand(hand));
         }
         return InteractionResultHolder.pass(player.getItemInHand(hand));
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, Level level, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
+        super.appendHoverText(stack, level, tooltip, flag);
+        CompoundTag tag = stack.getTag();
+        if (tag != null && tag.contains("inv")) {
+            CompoundTag invTag = tag.getCompound("inv");
+            ListTag items = invTag.getList("Items", 10); // CompoundTag
+            int displayed = 0;
+            int totalItems = 0;
+            for (int i = 0; i < items.size() && displayed <= 4; i++) {
+                CompoundTag itemTag = items.getCompound(i);
+                ItemStack item = ItemStack.of(itemTag);
+                if (!item.isEmpty()) {
+                    totalItems++;
+                    if (displayed < 4) {
+                        MutableComponent itemTooltip = item.getHoverName().copy();
+                        itemTooltip.append(" x").append(String.valueOf(item.getCount()));
+                        tooltip.add(itemTooltip);
+                        displayed++;
+                    }
+                }
+            }
+            if (totalItems - displayed > 0) {
+                tooltip.add(Component.translatable("item.ender_bags.ender_bag.more", totalItems - displayed)
+                        .withStyle(ChatFormatting.ITALIC));
+            }
+        }
     }
 
     @Override

@@ -17,5 +17,6 @@
     "item.ender_bags.ender_bag.green": "Green Ender Bag",
     "item.ender_bags.ender_bag.red": "Red Ender Bag",
     "item.ender_bags.ender_bag.black": "Black Ender Bag",
-    "container.ender_bags.ender_bag": "Ender Bag"
+    "container.ender_bags.ender_bag": "Ender Bag",
+    "item.ender_bags.ender_bag.more": "...and %s more"
 }
