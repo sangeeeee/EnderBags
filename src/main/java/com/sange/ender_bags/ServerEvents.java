@@ -23,7 +23,7 @@ public class ServerEvents {
             if (stack.is(ModItems.ENDER_BAG.get()) && player.getMainHandItem().equals(stack)) {
                 menu.removed(player); // Save NBT before toss
                 player.closeContainer();
-                System.out.println("Saved EnderBag NBT on toss for player " + player.getName().getString());
+//                System.out.println("Saved EnderBag NBT on toss for player " + player.getName().getString());
             }
         }
     }
@@ -34,7 +34,7 @@ public class ServerEvents {
         if (player.containerMenu instanceof EnderBagMenu menu) {
             menu.removed(player);
             player.closeContainer();
-            System.out.println("Saved EnderBag NBT on logout for player " + player.getName().getString());
+//            System.out.println("Saved EnderBag NBT on logout for player " + player.getName().getString());
         }
     }
 
@@ -44,7 +44,7 @@ public class ServerEvents {
         if (player.containerMenu instanceof EnderBagMenu menu) {
             menu.removed(player);
             player.closeContainer();
-            System.out.println("Saved EnderBag NBT on respawn for player " + player.getName().getString());
+//            System.out.println("Saved EnderBag NBT on respawn for player " + player.getName().getString());
         }
     }
 

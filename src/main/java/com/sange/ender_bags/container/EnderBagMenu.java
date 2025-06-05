@@ -131,7 +131,6 @@ public class EnderBagMenu extends AbstractContainerMenu {
             tag.put("inv", bagInventory.serializeNBT());
             bagStack.setTag(tag);
             playerInventory.setChanged(); // Mark inventory dirty to trigger player save
-            System.out.println("Saving EnderBag NBT for player " + playerInventory.player.getName().getString());
         }
     }
 
