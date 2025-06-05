@@ -13,7 +13,6 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.NotNull;
 
@@ -48,20 +47,6 @@ public class BagItem extends Item implements MenuProvider {
         }
         return InteractionResultHolder.pass(player.getItemInHand(hand));
     }
-
-    public static ItemStackHandler getHandlerForContainer(ItemStack stack) {
-        if (stack.isEmpty()) return null;
-        ItemStackHandler handler = new ItemStackHandler(104); // 8x13 slots
-        if (stack.hasTag()) {
-            CompoundTag tag = stack.getTag();
-            if (tag != null && tag.contains("inv")) {
-                handler.deserializeNBT(tag.getCompound("inv"));
-            }
-        }
-        return handler;
-    }
-
-
 
     @Override
     public @NotNull Component getDisplayName() {

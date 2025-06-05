@@ -33,11 +33,6 @@ public class EnderBagMenu extends AbstractContainerMenu {
         this.playerInventory = playerInventory;
         this.bagInventory = new ItemStackHandler(104) {
             @Override
-            protected void onContentsChanged(int slot) {
-                saveBagInventory();
-            }
-
-            @Override
             public boolean isItemValid(int slot, @NotNull ItemStack stack) {
                 return !stack.is(ModItems.ENDER_BAG.get()); // Prevent ender_bag placement
             }
@@ -72,7 +67,8 @@ public class EnderBagMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return !bagStack.isEmpty() && player.getItemInHand(bagHand).is(ModItems.ENDER_BAG.get());
+        return bagHand == InteractionHand.MAIN_HAND && !bagStack.isEmpty() &&
+                player.getItemInHand(bagHand).is(ModItems.ENDER_BAG.get());
     }
 
     @Override
@@ -84,7 +80,7 @@ public class EnderBagMenu extends AbstractContainerMenu {
     @Override
     public void slotsChanged(net.minecraft.world.@NotNull Container container) {
         super.slotsChanged(container);
-        saveBagInventory();
+        // No save here; defer to removed
     }
 
     @Override
@@ -134,6 +130,7 @@ public class EnderBagMenu extends AbstractContainerMenu {
             CompoundTag tag = bagStack.getOrCreateTag();
             tag.put("inv", bagInventory.serializeNBT());
             bagStack.setTag(tag);
+            playerInventory.setChanged(); // Mark inventory dirty to trigger player save
             System.out.println("Saving EnderBag NBT for player " + playerInventory.player.getName().getString());
         }
     }
