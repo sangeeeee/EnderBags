@@ -3,6 +3,8 @@ package com.sange.ender_bags.container;
 
 import com.sange.ender_bags.item.ModItems;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -71,10 +73,17 @@ public class EnderBagMenu extends AbstractContainerMenu {
                 player.getItemInHand(bagHand).is(ModItems.ENDER_BAG.get());
     }
 
+
     @Override
     public void removed(@NotNull Player player) {
         super.removed(player);
         saveBagInventory();
+        // Play close sound
+        if (!player.level().isClientSide) {
+            player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
+                    SoundEvents.BUNDLE_DROP_CONTENTS, SoundSource.PLAYERS,
+                    1.0F, player.level().random.nextFloat() * 0.1F + 0.9F);
+        }
     }
 
     @Override

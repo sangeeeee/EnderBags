@@ -4,6 +4,8 @@ import com.sange.ender_bags.container.EnderBagMenu;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.MenuProvider;
@@ -43,6 +45,10 @@ public class BagItem extends Item implements MenuProvider {
     public @NotNull InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand hand) {
         if (hand == InteractionHand.MAIN_HAND && !level.isClientSide && !(player.containerMenu instanceof EnderBagMenu)) {
             NetworkHooks.openScreen((ServerPlayer) player, this, buf -> buf.writeEnum(hand));
+            // Play open sound
+            level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                    SoundEvents.BUNDLE_INSERT, SoundSource.PLAYERS,
+                    1.0F, level.random.nextFloat() * 0.1F + 0.9F);
             return InteractionResultHolder.success(player.getItemInHand(hand));
         }
         return InteractionResultHolder.pass(player.getItemInHand(hand));
