@@ -13,7 +13,6 @@ import net.minecraftforge.fml.common.Mod;
 @SuppressWarnings("deprecation")
 @Mod.EventBusSubscriber(modid = EnderBags.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ClientSetup {
-
     @SubscribeEvent
     public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
         ItemColors itemColors = event.getItemColors();
@@ -22,13 +21,23 @@ public class ClientSetup {
                 CompoundTag display = stack.getTagElement("display");
                 if (display != null && display.contains("color", 99)) {
                     int color = display.getInt("color");
-                    // 白色袋子或未染色的袋子使用原始灰度纹理
                     if (color == DyeColor.WHITE.getTextColor()) {
-                        return -1;
+                        return -1; // Use original texture
                     }
-                    return color;
+                    // Find matching DyeColor
+                    for (DyeColor dyeColor : DyeColor.values()) {
+                        if (dyeColor.getTextColor() == color) {
+                            // Adjust color using getTextureDiffuseColors
+                            float[] diffuseColors = dyeColor.getTextureDiffuseColors();
+                            int r = (int) (255 * diffuseColors[0]);
+                            int g = (int) (255 * diffuseColors[1]);
+                            int b = (int) (255 * diffuseColors[2]);
+                            return (r << 16) | (g << 8) | b; // RGB, no alpha
+                        }
+                    }
+                    return color; // Fallback to original color
                 }
-                return -1; // 未染色的袋子使用原始灰度纹理
+                return -1; // Use original texture
             }
             return -1;
         }, ModItems.ENDER_BAG.get());
