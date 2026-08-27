@@ -185,6 +185,10 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('jar', Jar).configure {
     from(rootProject.file('LICENSE'))
+
+    // Keep the automated integration test and its empty structure out of release artifacts.
+    exclude('com/sange/ender_bags/gametest/**')
+    exclude('data/ender_bags/structure/empty.nbt')
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

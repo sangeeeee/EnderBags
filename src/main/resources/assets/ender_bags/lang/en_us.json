@@ -1,13 +1,22 @@
 {
-  "itemGroup.ender_bags": "Ender Bags Tab",
-  "block.ender_bags.ender_bags_block": "Ender Bags Block",
-  "item.ender_bags.ender_bags_item": "Ender Bags Item",
-
-  "ender_bags.configuration.title": "Ender Bags Continue Configs",
-  "ender_bags.configuration.section.ender_bags.common.toml": "Ender Bags Continue Configs",
-  "ender_bags.configuration.section.ender_bags.common.toml.title": "Ender Bags Continue Configs",
-  "ender_bags.configuration.items": "Item List",
-  "ender_bags.configuration.logDirtBlock": "Log Dirt Block",
-  "ender_bags.configuration.magicNumberIntroduction": "Magic Number Text",
-  "ender_bags.configuration.magicNumber": "Magic Number"
+  "item.ender_bags.ender_bag": "Ender Bag",
+  "itemGroup.ender_bags": "Ender Bags",
+  "item.ender_bags.ender_bag.white": "White Ender Bag",
+  "item.ender_bags.ender_bag.orange": "Orange Ender Bag",
+  "item.ender_bags.ender_bag.magenta": "Magenta Ender Bag",
+  "item.ender_bags.ender_bag.light_blue": "Light Blue Ender Bag",
+  "item.ender_bags.ender_bag.yellow": "Yellow Ender Bag",
+  "item.ender_bags.ender_bag.lime": "Lime Ender Bag",
+  "item.ender_bags.ender_bag.pink": "Pink Ender Bag",
+  "item.ender_bags.ender_bag.gray": "Gray Ender Bag",
+  "item.ender_bags.ender_bag.light_gray": "Light Gray Ender Bag",
+  "item.ender_bags.ender_bag.cyan": "Cyan Ender Bag",
+  "item.ender_bags.ender_bag.purple": "Purple Ender Bag",
+  "item.ender_bags.ender_bag.blue": "Blue Ender Bag",
+  "item.ender_bags.ender_bag.brown": "Brown Ender Bag",
+  "item.ender_bags.ender_bag.green": "Green Ender Bag",
+  "item.ender_bags.ender_bag.red": "Red Ender Bag",
+  "item.ender_bags.ender_bag.black": "Black Ender Bag",
+  "container.ender_bags.ender_bag": "Ender Bag",
+  "item.ender_bags.ender_bag.more": "...and %s more"
 }

@@ -1,0 +1,22 @@
+{
+  "item.ender_bags.ender_bag": "末影袋",
+  "itemGroup.ender_bags": "末影袋",
+  "item.ender_bags.ender_bag.white": "白色末影袋",
+  "item.ender_bags.ender_bag.orange": "橙色末影袋",
+  "item.ender_bags.ender_bag.magenta": "品红色末影袋",
+  "item.ender_bags.ender_bag.light_blue": "浅蓝色末影袋",
+  "item.ender_bags.ender_bag.yellow": "黄色末影袋",
+  "item.ender_bags.ender_bag.lime": "黄绿色末影袋",
+  "item.ender_bags.ender_bag.pink": "粉色末影袋",
+  "item.ender_bags.ender_bag.gray": "灰色末影袋",
+  "item.ender_bags.ender_bag.light_gray": "浅灰色末影袋",
+  "item.ender_bags.ender_bag.cyan": "青色末影袋",
+  "item.ender_bags.ender_bag.purple": "紫色末影袋",
+  "item.ender_bags.ender_bag.blue": "蓝色末影袋",
+  "item.ender_bags.ender_bag.brown": "棕色末影袋",
+  "item.ender_bags.ender_bag.green": "绿色末影袋",
+  "item.ender_bags.ender_bag.red": "红色末影袋",
+  "item.ender_bags.ender_bag.black": "黑色末影袋",
+  "container.ender_bags.ender_bag": "末影袋",
+  "item.ender_bags.ender_bag.more": "还有 %s 项未显示……"
+}
