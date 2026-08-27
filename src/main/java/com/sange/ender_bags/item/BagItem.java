@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 
 public final class BagItem extends Item {
     private static final int TOOLTIP_ENTRY_LIMIT = 4;
+    private static final int DEFAULT_ENTITY_LIFESPAN = 6000;
 
     public BagItem(Properties properties) {
         super(properties);
@@ -58,7 +59,14 @@ public final class BagItem extends Item {
             return InteractionResultHolder.fail(stack);
         }
 
-        BagContents.migrateLegacyData(stack, level.registryAccess());
+        if (!BagContents.migrateLegacyData(stack, level.registryAccess())
+                || BagContents.load(stack, level.registryAccess()).isEmpty()) {
+            serverPlayer.displayClientMessage(
+                    Component.translatable("item.ender_bags.ender_bag.invalid_contents")
+                            .withStyle(ChatFormatting.RED),
+                    true);
+            return InteractionResultHolder.fail(stack);
+        }
         player.getInventory().setChanged();
 
         SimpleMenuProvider provider = new SimpleMenuProvider(
@@ -89,7 +97,13 @@ public final class BagItem extends Item {
         HolderLookup.Provider registries = context.registries();
         Iterable<ItemStack> storedStacks;
         if (registries != null) {
-            storedStacks = BagContents.load(stack, registries);
+            var loaded = BagContents.load(stack, registries);
+            if (loaded.isEmpty()) {
+                tooltip.add(Component.translatable("item.ender_bags.ender_bag.invalid_contents")
+                        .withStyle(ChatFormatting.RED));
+                return;
+            }
+            storedStacks = loaded.get();
         } else {
             storedStacks = stack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY)
                     .nonEmptyItemsCopy();
@@ -117,29 +131,33 @@ public final class BagItem extends Item {
 
     @Override
     public boolean canBeHurtBy(ItemStack stack, DamageSource source) {
-        return source.is(DamageTypes.FELL_OUT_OF_WORLD);
+        return !BagContents.hasStoredItems(stack) || source.is(DamageTypes.FELL_OUT_OF_WORLD);
     }
 
     @Override
     public int getEntityLifespan(ItemStack itemStack, Level level) {
-        return Integer.MAX_VALUE;
+        return BagContents.hasStoredItems(itemStack) ? Integer.MAX_VALUE : DEFAULT_ENTITY_LIFESPAN;
     }
 
     @Override
     public boolean onEntityItemUpdate(ItemStack stack, ItemEntity entity) {
-        entity.setUnlimitedLifetime();
+        if (BagContents.hasStoredItems(stack)) {
+            entity.lifespan = Integer.MAX_VALUE;
+        } else if (entity.lifespan == Integer.MAX_VALUE) {
+            entity.lifespan = DEFAULT_ENTITY_LIFESPAN;
+        }
         return false;
     }
 
     @Override
     public boolean canFitInsideContainerItems(ItemStack stack) {
-        return false;
+        return true;
     }
 
     @Deprecated
     @Override
     public boolean canFitInsideContainerItems() {
-        return false;
+        return true;
     }
 
     public static ItemStack createColoredStack(DyeColor color) {

@@ -18,5 +18,6 @@
   "item.ender_bags.ender_bag.red": "红色末影袋",
   "item.ender_bags.ender_bag.black": "黑色末影袋",
   "container.ender_bags.ender_bag": "末影袋",
-  "item.ender_bags.ender_bag.more": "还有 %s 项未显示……"
+  "item.ender_bags.ender_bag.more": "还有 %s 项未显示……",
+  "item.ender_bags.ender_bag.invalid_contents": "该末影袋包含无效或冲突数据；原始数据已保留且未作修改"
 }

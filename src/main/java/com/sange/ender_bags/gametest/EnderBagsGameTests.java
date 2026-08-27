@@ -1,6 +1,7 @@
 package com.sange.ender_bags.gametest;
 
 import com.sange.ender_bags.EnderBags;
+import com.sange.ender_bags.container.EnderBagMenu;
 import com.sange.ender_bags.item.BagContents;
 import com.sange.ender_bags.item.ModItems;
 import com.sange.ender_bags.recipe.DyeBagRecipe;
@@ -12,12 +13,16 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -32,7 +37,7 @@ public final class EnderBagsGameTests {
     @GameTest(
             template = "empty",
             timeoutTicks = 40)
-    public static void storageDurabilityAndMigration(GameTestHelper helper) {
+    public static void storageDurabilityMigrationAndTransactions(GameTestHelper helper) {
         var level = helper.getLevel();
 
         helper.assertTrue(
@@ -46,20 +51,103 @@ public final class EnderBagsGameTests {
                         .isPresent(),
                 "The Ender Bag dye recipe was not loaded");
 
+        ItemStack emptyBag = ModItems.ENDER_BAG.toStack();
+        helper.assertTrue(emptyBag.getMaxStackSize() == 1, "An empty Ender Bag can stack");
+        helper.assertTrue(!BagContents.hasStoredItems(emptyBag), "A new Ender Bag is not empty");
+        helper.assertTrue(emptyBag.canFitInsideContainerItems(), "An empty Ender Bag cannot enter an item container");
+
+        ItemEntity emptyLavaEntity = new ItemEntity(level, 0.0, 64.0, 0.0, emptyBag.copy());
+        helper.assertTrue(emptyLavaEntity.lifespan == 6000, "An empty Ender Bag cannot despawn normally");
+        helper.assertTrue(
+                emptyLavaEntity.hurt(level.damageSources().lava(), Float.MAX_VALUE)
+                        && emptyLavaEntity.isRemoved(),
+                "Lava could not destroy an empty Ender Bag");
+
+        ItemEntity emptyCactusEntity = new ItemEntity(level, 0.0, 64.0, 0.0, emptyBag.copy());
+        helper.assertTrue(
+                emptyCactusEntity.hurt(level.damageSources().cactus(), Float.MAX_VALUE)
+                        && emptyCactusEntity.isRemoved(),
+                "Cactus damage could not destroy an empty Ender Bag");
+
         ItemStack bag = ModItems.ENDER_BAG.toStack();
         NonNullList<ItemStack> contents = NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY);
         contents.set(0, new ItemStack(Items.DIAMOND, 64));
         contents.set(BagContents.SLOT_COUNT - 1, new ItemStack(Items.ENDER_PEARL, 16));
-        BagContents.save(bag, contents);
+        helper.assertTrue(BagContents.save(bag, contents), "A valid contents snapshot was rejected");
 
-        NonNullList<ItemStack> loaded = BagContents.load(bag, level.registryAccess());
-        helper.assertTrue(loaded.size() == BagContents.SLOT_COUNT, "The bag did not retain its fixed slot count");
-        helper.assertTrue(loaded.get(0).is(Items.DIAMOND) && loaded.get(0).getCount() == 64,
-                "The first stored stack was corrupted");
+        // Both save and load must be detached snapshots; aliasing would enable duplication or loss.
+        contents.get(0).setCount(1);
+        NonNullList<ItemStack> loaded = requireContents(bag, level, helper);
         helper.assertTrue(
-                loaded.get(BagContents.SLOT_COUNT - 1).is(Items.ENDER_PEARL)
-                        && loaded.get(BagContents.SLOT_COUNT - 1).getCount() == 16,
-                "The last stored stack was corrupted");
+                loaded.get(0).is(Items.DIAMOND) && loaded.get(0).getCount() == 64,
+                "Saving retained a mutable reference to the source inventory");
+        loaded.get(0).setCount(2);
+        helper.assertTrue(
+                requireContents(bag, level, helper).get(0).getCount() == 64,
+                "Loading exposed a mutable reference to persisted contents");
+
+        helper.assertTrue(BagContents.hasStoredItems(bag), "A filled Ender Bag was reported as empty");
+        helper.assertTrue(bag.getMaxStackSize() == 1, "A filled Ender Bag can stack");
+        helper.assertTrue(bag.canFitInsideContainerItems(), "A filled Ender Bag cannot enter an item container");
+
+        @SuppressWarnings("removal")
+        Player mockPlayer = helper.makeMockServerPlayerInLevel();
+        SimpleContainer chestInventory = new SimpleContainer(27);
+        ChestMenu chestMenu = ChestMenu.threeRows(1, mockPlayer.getInventory(), chestInventory);
+        helper.assertTrue(
+                chestMenu.getSlot(0).mayPlace(bag),
+                "An ordinary chest rejected a filled Ender Bag");
+
+        mockPlayer.getInventory().selected = 0;
+        ItemStack openedBag = ModItems.ENDER_BAG.toStack();
+        mockPlayer.getInventory().setItem(0, openedBag);
+        EnderBagMenu enderBagMenu = new EnderBagMenu(
+                2,
+                mockPlayer.getInventory(),
+                0,
+                openedBag);
+        helper.assertTrue(enderBagMenu.stillValid(mockPlayer), "A valid Ender Bag menu was rejected");
+        helper.assertTrue(
+                !enderBagMenu.getSlot(0).mayPlace(emptyBag)
+                        && !enderBagMenu.getSlot(0).mayPlace(bag),
+                "An Ender Bag accepted another Ender Bag");
+
+        // Shift-click in and back out. Each half must already be reflected in the held stack.
+        mockPlayer.getInventory().setItem(9, new ItemStack(Items.GOLD_INGOT, 32));
+        helper.assertTrue(
+                !enderBagMenu.quickMoveStack(mockPlayer, BagContents.SLOT_COUNT).isEmpty(),
+                "Shift-clicking into an Ender Bag failed");
+        helper.assertTrue(
+                mockPlayer.getInventory().getItem(9).isEmpty()
+                        && requireContents(openedBag, level, helper).get(0).is(Items.GOLD_INGOT)
+                        && requireContents(openedBag, level, helper).get(0).getCount() == 32,
+                "The insert operation was not committed to the held bag");
+        helper.assertTrue(
+                !enderBagMenu.quickMoveStack(mockPlayer, 0).isEmpty(),
+                "Shift-clicking out of an Ender Bag failed");
+        helper.assertTrue(
+                !BagContents.hasStoredItems(openedBag)
+                        && countItem(mockPlayer, Items.GOLD_INGOT) == 32,
+                "The extraction operation did not conserve its item count");
+
+        // Replacing the selected stack invalidates the session; close must not overwrite it.
+        ItemStack replacementBag = ModItems.ENDER_BAG.toStack();
+        mockPlayer.getInventory().setItem(0, replacementBag);
+        helper.assertTrue(!enderBagMenu.stillValid(mockPlayer), "A copied replacement bag kept the session alive");
+        enderBagMenu.removed(mockPlayer);
+        helper.assertTrue(
+                mockPlayer.getInventory().getItem(0) == replacementBag
+                        && !BagContents.hasStoredItems(replacementBag),
+                "Closing a stale menu overwrote the replacement stack");
+
+        // Vanilla close/disconnect handling must return the server-side cursor stack.
+        mockPlayer.getInventory().setItem(0, openedBag);
+        EnderBagMenu closeMenu = new EnderBagMenu(3, mockPlayer.getInventory(), 0, openedBag);
+        closeMenu.setCarried(new ItemStack(Items.EMERALD, 7));
+        closeMenu.removed(mockPlayer);
+        helper.assertTrue(
+                closeMenu.getCarried().isEmpty() && countItem(mockPlayer, Items.EMERALD) == 7,
+                "Closing the menu lost its server-side cursor stack");
 
         DyeBagRecipe dyeRecipe = new DyeBagRecipe(CraftingBookCategory.MISC);
         CraftingInput dyeInput = CraftingInput.of(
@@ -75,18 +163,29 @@ public final class EnderBagsGameTests {
                                 == (DyeColor.RED.getTextureDiffuseColor() & 0xFFFFFF),
                 "Dyeing did not apply the requested color");
         helper.assertTrue(
-                BagContents.load(redBag, level.registryAccess()).get(0).is(Items.DIAMOND),
+                requireContents(redBag, level, helper).get(0).is(Items.DIAMOND),
                 "Dyeing discarded the bag's contents");
 
         ItemEntity protectedEntity = new ItemEntity(level, 0.0, 64.0, 0.0, bag.copy());
         helper.assertTrue(
                 !protectedEntity.hurt(level.damageSources().lava(), Float.MAX_VALUE),
-                "Lava damage destroyed an Ender Bag");
+                "Lava damage destroyed a filled Ender Bag");
         helper.assertTrue(
                 !protectedEntity.hurt(level.damageSources().cactus(), Float.MAX_VALUE),
-                "Cactus damage destroyed an Ender Bag");
+                "Cactus damage destroyed a filled Ender Bag");
         protectedEntity.tick();
-        helper.assertTrue(protectedEntity.getAge() == -32768, "A dropped Ender Bag can still despawn");
+        helper.assertTrue(
+                protectedEntity.lifespan == Integer.MAX_VALUE && !protectedEntity.isRemoved(),
+                "A filled Ender Bag can still despawn");
+        helper.assertTrue(
+                BagContents.save(
+                        protectedEntity.getItem(),
+                        NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY)),
+                "Could not empty the dropped Ender Bag");
+        protectedEntity.tick();
+        helper.assertTrue(
+                protectedEntity.lifespan == 6000,
+                "A dropped bag did not regain its normal lifespan after becoming empty");
 
         ItemEntity voidDamageEntity = new ItemEntity(level, 0.0, 64.0, 0.0, bag.copy());
         helper.assertTrue(
@@ -103,18 +202,81 @@ public final class EnderBagsGameTests {
         fallingEntity.tick();
         helper.assertTrue(fallingEntity.isRemoved(), "An Ender Bag survived below the void threshold");
 
+        // Pre-existing nested data is preserved for manual recovery, but the menu refuses new nesting.
+        ItemStack nestingBag = ModItems.ENDER_BAG.toStack();
+        NonNullList<ItemStack> nestedContents =
+                NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY);
+        nestedContents.set(0, emptyBag.copy());
+        helper.assertTrue(BagContents.save(nestingBag, nestedContents), "Could not create recovery test data");
+        helper.assertTrue(
+                requireContents(nestingBag, level, helper).get(0).is(ModItems.ENDER_BAG.get()),
+                "Pre-existing nested bag data was silently deleted");
+
         ItemStack legacyBag = createLegacyBag();
-        NonNullList<ItemStack> migrated = BagContents.load(legacyBag, level.registryAccess());
-        helper.assertTrue(migrated.size() == BagContents.SLOT_COUNT,
-                "A hostile legacy Size value changed the bag capacity");
+        helper.assertTrue(BagContents.hasStoredItems(legacyBag), "A filled legacy bag lost protection");
+        helper.assertTrue(
+                BagContents.migrateLegacyData(legacyBag, level.registryAccess()),
+                "A valid legacy bag could not be migrated");
+        NonNullList<ItemStack> migrated = requireContents(legacyBag, level, helper);
         helper.assertTrue(
                 migrated.get(BagContents.SLOT_COUNT - 1).is(Items.DIAMOND)
                         && migrated.get(BagContents.SLOT_COUNT - 1).getCount() == 64,
                 "The legacy inventory contents were not migrated");
-        helper.assertTrue(migrated.get(0).isEmpty(), "A nested legacy Ender Bag was accepted");
+        helper.assertTrue(
+                migrated.get(0).is(ModItems.ENDER_BAG.get()),
+                "A pre-existing nested legacy bag was silently deleted");
         helper.assertTrue(!legacyBag.has(DataComponents.CUSTOM_DATA), "Migrated legacy data was not removed");
+        helper.assertTrue(
+                BagContents.migrateLegacyData(legacyBag, level.registryAccess()),
+                "Legacy migration was not idempotent");
+
+        ItemStack malformedLegacyBag = createMalformedLegacyBag();
+        CustomData malformedBefore = malformedLegacyBag.get(DataComponents.CUSTOM_DATA);
+        helper.assertTrue(
+                BagContents.load(malformedLegacyBag, level.registryAccess()).isEmpty()
+                        && !BagContents.migrateLegacyData(malformedLegacyBag, level.registryAccess()),
+                "Conflicting legacy data was accepted");
+        helper.assertTrue(
+                malformedBefore != null
+                        && malformedBefore.equals(malformedLegacyBag.get(DataComponents.CUSTOM_DATA))
+                        && !malformedLegacyBag.has(DataComponents.CONTAINER),
+                "Failed migration modified or deleted the original legacy data");
+
+        ItemStack overflowBag = ModItems.ENDER_BAG.toStack();
+        NonNullList<ItemStack> overflow =
+                NonNullList.withSize(BagContents.SLOT_COUNT + 1, ItemStack.EMPTY);
+        overflow.set(BagContents.SLOT_COUNT, new ItemStack(Items.NETHERITE_INGOT));
+        ItemContainerContents overflowComponent = ItemContainerContents.fromItems(overflow);
+        overflowBag.set(DataComponents.CONTAINER, overflowComponent);
+        helper.assertTrue(
+                BagContents.load(overflowBag, level.registryAccess()).isEmpty()
+                        && !BagContents.save(
+                                overflowBag,
+                                NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY))
+                        && overflowComponent.equals(overflowBag.get(DataComponents.CONTAINER)),
+                "Hidden overflow data was silently overwritten");
 
         helper.succeed();
+    }
+
+    private static NonNullList<ItemStack> requireContents(
+            ItemStack bag,
+            net.minecraft.world.level.Level level,
+            GameTestHelper helper) {
+        var loaded = BagContents.load(bag, level.registryAccess());
+        helper.assertTrue(loaded.isPresent(), "Valid Ender Bag contents could not be read");
+        return loaded.orElseThrow();
+    }
+
+    private static int countItem(Player player, net.minecraft.world.item.Item item) {
+        int count = 0;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(item)) {
+                count += stack.getCount();
+            }
+        }
+        return count;
     }
 
     private static ItemStack createLegacyBag() {
@@ -132,11 +294,24 @@ public final class EnderBagsGameTests {
         return bag;
     }
 
+    private static ItemStack createMalformedLegacyBag() {
+        ItemStack bag = ModItems.ENDER_BAG.toStack();
+        CompoundTag root = new CompoundTag();
+        CompoundTag inventory = new CompoundTag();
+        ListTag items = new ListTag();
+        items.add(createLegacyStack(0, "minecraft:diamond", 1));
+        items.add(createLegacyStack(0, "minecraft:emerald", 1));
+        inventory.put("Items", items);
+        root.put("inv", inventory);
+        CustomData.set(DataComponents.CUSTOM_DATA, bag, root);
+        return bag;
+    }
+
     private static CompoundTag createLegacyStack(int slot, String itemId, int count) {
         CompoundTag stack = new CompoundTag();
         stack.putInt("Slot", slot);
         stack.putString("id", itemId);
-        stack.putByte("Count", (byte) count);
+        stack.putByte("Count", (byte)count);
         return stack;
     }
 }

@@ -1,8 +1,10 @@
 package com.sange.ender_bags.container;
 
+import com.sange.ender_bags.EnderBags;
 import com.sange.ender_bags.item.BagContents;
 import com.sange.ender_bags.item.BagItem;
 import com.sange.ender_bags.item.ModItems;
+import java.util.Optional;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.sounds.SoundEvents;
@@ -32,6 +34,7 @@ public final class EnderBagMenu extends AbstractContainerMenu {
     private final int lockedMenuSlot;
     private final ItemStack bagStack;
     private final BagInventory bagInventory;
+    private boolean storageWritable;
 
     public EnderBagMenu(int containerId, Inventory playerInventory, int bagInventorySlot, ItemStack bagStack) {
         super(ModMenus.ENDER_BAG.get(), containerId);
@@ -43,9 +46,21 @@ public final class EnderBagMenu extends AbstractContainerMenu {
         this.bagInventorySlot = bagInventorySlot;
         this.lockedMenuSlot = HOTBAR_START + bagInventorySlot;
         this.bagStack = bagStack;
-        NonNullList<ItemStack> storedItems = bagStack.is(ModItems.ENDER_BAG.get())
-                ? BagContents.load(bagStack, playerInventory.player.level().registryAccess())
-                : NonNullList.withSize(BAG_SLOT_COUNT, ItemStack.EMPTY);
+        NonNullList<ItemStack> storedItems;
+        if (playerInventory.player.level().isClientSide) {
+            storedItems = NonNullList.withSize(BAG_SLOT_COUNT, ItemStack.EMPTY);
+            this.storageWritable = true;
+        } else {
+            boolean migrated = BagContents.migrateLegacyData(
+                    bagStack,
+                    playerInventory.player.level().registryAccess());
+            Optional<NonNullList<ItemStack>> loaded = migrated
+                    ? BagContents.load(bagStack, playerInventory.player.level().registryAccess())
+                    : Optional.empty();
+            storedItems = loaded.orElseGet(
+                    () -> NonNullList.withSize(BAG_SLOT_COUNT, ItemStack.EMPTY));
+            this.storageWritable = loaded.isPresent();
+        }
         this.bagInventory = new BagInventory(storedItems);
 
         addBagSlots();
@@ -100,7 +115,9 @@ public final class EnderBagMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        if (player != playerInventory.player || player.getInventory().selected != bagInventorySlot) {
+        if (!storageWritable
+                || player != playerInventory.player
+                || player.getInventory().selected != bagInventorySlot) {
             return false;
         }
 
@@ -115,7 +132,9 @@ public final class EnderBagMenu extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotId, int button, ClickType clickType, Player player) {
-        if (slotId == lockedMenuSlot || (clickType == ClickType.SWAP && button == bagInventorySlot)) {
+        if (!stillValid(player)
+                || slotId == lockedMenuSlot
+                || (clickType == ClickType.SWAP && button == bagInventorySlot)) {
             return;
         }
         super.clicked(slotId, button, clickType, player);
@@ -123,7 +142,10 @@ public final class EnderBagMenu extends AbstractContainerMenu {
 
     @Override
     public @NotNull ItemStack quickMoveStack(@NotNull Player player, int slotIndex) {
-        if (slotIndex < 0 || slotIndex >= slots.size() || slotIndex == lockedMenuSlot) {
+        if (!stillValid(player)
+                || slotIndex < 0
+                || slotIndex >= slots.size()
+                || slotIndex == lockedMenuSlot) {
             return ItemStack.EMPTY;
         }
 
@@ -164,8 +186,8 @@ public final class EnderBagMenu extends AbstractContainerMenu {
 
     @Override
     public void removed(@NotNull Player player) {
-        saveBagInventory();
         super.removed(player);
+        saveBagInventory();
         if (!player.level().isClientSide) {
             player.level().playSound(
                     null,
@@ -180,9 +202,16 @@ public final class EnderBagMenu extends AbstractContainerMenu {
     }
 
     private void saveBagInventory() {
-        if (!playerInventory.player.level().isClientSide && bagStack.is(ModItems.ENDER_BAG.get())) {
-            BagContents.save(bagStack, bagInventory.stacksView());
-            playerInventory.setChanged();
+        if (!playerInventory.player.level().isClientSide
+                && storageWritable
+                && bagStack.is(ModItems.ENDER_BAG.get())) {
+            if (BagContents.save(bagStack, bagInventory.stacksView())) {
+                playerInventory.setChanged();
+            } else {
+                storageWritable = false;
+                EnderBags.LOGGER.error(
+                        "Closed an Ender Bag menu after its contents snapshot was rejected");
+            }
         }
     }
 

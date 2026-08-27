@@ -18,5 +18,6 @@
   "item.ender_bags.ender_bag.red": "Red Ender Bag",
   "item.ender_bags.ender_bag.black": "Black Ender Bag",
   "container.ender_bags.ender_bag": "Ender Bag",
-  "item.ender_bags.ender_bag.more": "...and %s more"
+  "item.ender_bags.ender_bag.more": "...and %s more",
+  "item.ender_bags.ender_bag.invalid_contents": "This Ender Bag contains invalid or conflicting data; it was left unchanged"
 }

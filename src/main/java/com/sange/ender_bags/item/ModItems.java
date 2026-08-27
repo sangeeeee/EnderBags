@@ -11,7 +11,7 @@ public final class ModItems {
     public static final DeferredItem<BagItem> ENDER_BAG = ITEMS.registerItem(
             "ender_bag",
             BagItem::new,
-            new Item.Properties().stacksTo(1).fireResistant());
+            new Item.Properties().stacksTo(1));
 
     private ModItems() {
     }

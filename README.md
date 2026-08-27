@@ -10,8 +10,14 @@ This project targets Minecraft 1.21.1 with NeoForge.
 - A portable Ender Bag with 104 storage slots.
 - Open the bag by holding it in the main hand and right-clicking.
 - Dye bags into any of Minecraft's 16 dye colors without losing their contents.
-- Dropped bags do not despawn and cannot be destroyed by fire, lava, cacti,
-  explosions, or other damage. They are still destroyed after falling into the void.
+- Empty bags behave like normal items and may be destroyed.
+- Filled bags do not despawn and cannot be destroyed by ordinary damage. They are still
+  destroyed after falling into the void.
+- Ender Bags may be stored in ordinary containers, but an Ender Bag cannot contain another
+  Ender Bag.
+- Ender Bags always have a maximum stack size of one.
+- Bag contents are authoritative on the server and committed to the held item after every
+  slot mutation. Invalid or conflicting legacy data is preserved instead of silently cleaned.
 - Existing bag contents and colors from the Minecraft 1.20.1 version are migrated
   to Minecraft 1.21 data components when the bag is first used.
 
