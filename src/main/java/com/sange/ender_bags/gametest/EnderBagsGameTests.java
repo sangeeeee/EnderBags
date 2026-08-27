@@ -3,6 +3,7 @@ package com.sange.ender_bags.gametest;
 import com.sange.ender_bags.EnderBags;
 import com.sange.ender_bags.container.EnderBagMenu;
 import com.sange.ender_bags.item.BagContents;
+import com.sange.ender_bags.item.BagItem;
 import com.sange.ender_bags.item.ModItems;
 import com.sange.ender_bags.recipe.DyeBagRecipe;
 import java.util.List;
@@ -18,6 +19,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
@@ -25,6 +27,7 @@ import net.minecraft.world.item.component.DyedItemColor;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -40,11 +43,7 @@ public final class EnderBagsGameTests {
     public static void storageDurabilityMigrationAndTransactions(GameTestHelper helper) {
         var level = helper.getLevel();
 
-        helper.assertTrue(
-                level.getRecipeManager()
-                        .byKey(ResourceLocation.fromNamespaceAndPath(EnderBags.MOD_ID, "ender_bag"))
-                        .isPresent(),
-                "The Ender Bag crafting recipe was not loaded");
+        testWoolRecipes(level, helper);
         helper.assertTrue(
                 level.getRecipeManager()
                         .byKey(ResourceLocation.fromNamespaceAndPath(EnderBags.MOD_ID, "dye_ender_bag"))
@@ -257,6 +256,78 @@ public final class EnderBagsGameTests {
                 "Hidden overflow data was silently overwritten");
 
         helper.succeed();
+    }
+
+    private static void testWoolRecipes(
+            net.minecraft.world.level.Level level,
+            GameTestHelper helper) {
+        for (DyeColor color : DyeColor.values()) {
+            String path = color == DyeColor.WHITE
+                    ? "ender_bag"
+                    : "ender_bag_" + color.getName();
+            ResourceLocation expectedId =
+                    ResourceLocation.fromNamespaceAndPath(EnderBags.MOD_ID, path);
+            helper.assertTrue(
+                    level.getRecipeManager().byKey(expectedId).isPresent(),
+                    "Missing Ender Bag crafting recipe for " + color.getName());
+
+            CraftingInput input = bagCraftingInput(woolFor(color), woolFor(color));
+            var matched = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level);
+            helper.assertTrue(
+                    matched.isPresent() && matched.orElseThrow().id().equals(expectedId),
+                    "Matching " + color.getName() + " wool did not select its bag recipe");
+
+            ItemStack result = matched.orElseThrow().value().assemble(input, level.registryAccess());
+            helper.assertTrue(
+                    result.is(ModItems.ENDER_BAG.get())
+                            && result.getCount() == 1
+                            && BagItem.getDyeColor(result) == color,
+                    "The " + color.getName() + " wool recipe produced the wrong bag color");
+        }
+
+        CraftingInput mixedInput = bagCraftingInput(Items.RED_WOOL, Items.BLUE_WOOL);
+        helper.assertTrue(
+                level.getRecipeManager()
+                        .getRecipeFor(RecipeType.CRAFTING, mixedInput, level)
+                        .isEmpty(),
+                "Mixed wool colors unexpectedly formed an Ender Bag");
+    }
+
+    private static CraftingInput bagCraftingInput(Item primaryWool, Item differentBottomWool) {
+        return CraftingInput.of(
+                3,
+                3,
+                List.of(
+                        new ItemStack(primaryWool),
+                        new ItemStack(Items.STRING),
+                        new ItemStack(primaryWool),
+                        new ItemStack(primaryWool),
+                        new ItemStack(Items.ENDER_CHEST),
+                        new ItemStack(primaryWool),
+                        new ItemStack(primaryWool),
+                        new ItemStack(primaryWool),
+                        new ItemStack(differentBottomWool)));
+    }
+
+    private static Item woolFor(DyeColor color) {
+        return switch (color) {
+            case WHITE -> Items.WHITE_WOOL;
+            case ORANGE -> Items.ORANGE_WOOL;
+            case MAGENTA -> Items.MAGENTA_WOOL;
+            case LIGHT_BLUE -> Items.LIGHT_BLUE_WOOL;
+            case YELLOW -> Items.YELLOW_WOOL;
+            case LIME -> Items.LIME_WOOL;
+            case PINK -> Items.PINK_WOOL;
+            case GRAY -> Items.GRAY_WOOL;
+            case LIGHT_GRAY -> Items.LIGHT_GRAY_WOOL;
+            case CYAN -> Items.CYAN_WOOL;
+            case PURPLE -> Items.PURPLE_WOOL;
+            case BLUE -> Items.BLUE_WOOL;
+            case BROWN -> Items.BROWN_WOOL;
+            case GREEN -> Items.GREEN_WOOL;
+            case RED -> Items.RED_WOOL;
+            case BLACK -> Items.BLACK_WOOL;
+        };
     }
 
     private static NonNullList<ItemStack> requireContents(

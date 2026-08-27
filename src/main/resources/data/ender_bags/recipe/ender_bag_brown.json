@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "ender_bags:ender_bag",
+  "pattern": ["WSW", "WEW", "WWW"],
+  "key": {
+    "W": { "item": "minecraft:brown_wool" },
+    "S": { "item": "minecraft:string" },
+    "E": { "item": "minecraft:ender_chest" }
+  },
+  "result": {
+    "id": "ender_bags:ender_bag",
+    "count": 1,
+    "components": {
+      "minecraft:dyed_color": { "rgb": 8606770, "show_in_tooltip": false }
+    }
+  }
+}

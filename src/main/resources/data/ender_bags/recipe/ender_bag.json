@@ -1,6 +1,7 @@
 {
   "type": "minecraft:crafting_shaped",
   "category": "misc",
+  "group": "ender_bags:ender_bag",
   "pattern": [
     "WSW",
     "WEW",
@@ -8,7 +9,7 @@
   ],
   "key": {
     "W": {
-      "tag": "minecraft:wool"
+      "item": "minecraft:white_wool"
     },
     "S": {
       "item": "minecraft:string"

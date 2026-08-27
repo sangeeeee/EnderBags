@@ -26,7 +26,22 @@
   ],
   "rewards": {
     "recipes": [
-      "ender_bags:ender_bag"
+      "ender_bags:ender_bag",
+      "ender_bags:ender_bag_orange",
+      "ender_bags:ender_bag_magenta",
+      "ender_bags:ender_bag_light_blue",
+      "ender_bags:ender_bag_yellow",
+      "ender_bags:ender_bag_lime",
+      "ender_bags:ender_bag_pink",
+      "ender_bags:ender_bag_gray",
+      "ender_bags:ender_bag_light_gray",
+      "ender_bags:ender_bag_cyan",
+      "ender_bags:ender_bag_purple",
+      "ender_bags:ender_bag_blue",
+      "ender_bags:ender_bag_brown",
+      "ender_bags:ender_bag_green",
+      "ender_bags:ender_bag_red",
+      "ender_bags:ender_bag_black"
     ]
   }
 }
