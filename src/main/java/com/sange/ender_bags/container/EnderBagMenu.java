@@ -10,14 +10,13 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.ItemStackHandler;
-import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
 
 public final class EnderBagMenu extends AbstractContainerMenu {
@@ -35,6 +34,8 @@ public final class EnderBagMenu extends AbstractContainerMenu {
     private final ItemStack bagStack;
     private final BagInventory bagInventory;
     private boolean storageWritable;
+    private boolean batchingRemoteUpdates;
+    private boolean bagInventoryDirty;
 
     public EnderBagMenu(int containerId, Inventory playerInventory, int bagInventorySlot, ItemStack bagStack) {
         super(ModMenus.ENDER_BAG.get(), containerId);
@@ -140,6 +141,24 @@ public final class EnderBagMenu extends AbstractContainerMenu {
         super.clicked(slotId, button, clickType, player);
     }
 
+    /**
+     * Vanilla and ClientSort both use this pair around a multi-slot remote transaction.
+     * Defer persistence until the whole operation has completed (or has rolled back), so a
+     * server crash cannot persist one of ClientSort's temporary duplicate/missing-item states.
+     */
+    @Override
+    public void suppressRemoteUpdates() {
+        super.suppressRemoteUpdates();
+        batchingRemoteUpdates = true;
+    }
+
+    @Override
+    public void resumeRemoteUpdates() {
+        super.resumeRemoteUpdates();
+        batchingRemoteUpdates = false;
+        commitDirtyBagInventory();
+    }
+
     @Override
     public @NotNull ItemStack quickMoveStack(@NotNull Player player, int slotIndex) {
         if (!stillValid(player)
@@ -206,6 +225,7 @@ public final class EnderBagMenu extends AbstractContainerMenu {
                 && storageWritable
                 && bagStack.is(ModItems.ENDER_BAG.get())) {
             if (BagContents.save(bagStack, bagInventory.stacksView())) {
+                bagInventoryDirty = false;
                 playerInventory.setChanged();
             } else {
                 storageWritable = false;
@@ -215,38 +235,61 @@ public final class EnderBagMenu extends AbstractContainerMenu {
         }
     }
 
-    private final class BagInventory extends ItemStackHandler {
-        private BagInventory(NonNullList<ItemStack> stacks) {
-            super(stacks);
+    private void onBagInventoryChanged() {
+        if (playerInventory.player.level().isClientSide) {
+            return;
         }
 
-        @Override
-        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return !(stack.getItem() instanceof BagItem);
-        }
-
-        @Override
-        protected void onContentsChanged(int slot) {
-            saveBagInventory();
-        }
-
-        private void markContentsChanged(int slot) {
-            onContentsChanged(slot);
-        }
-
-        private NonNullList<ItemStack> stacksView() {
-            return stacks;
+        bagInventoryDirty = true;
+        if (!batchingRemoteUpdates) {
+            commitDirtyBagInventory();
         }
     }
 
-    private final class BagSlot extends SlotItemHandler {
-        private BagSlot(ItemStackHandler handler, int index, int x, int y) {
-            super(handler, index, x, y);
+    private void commitDirtyBagInventory() {
+        if (bagInventoryDirty) {
+            saveBagInventory();
+        }
+    }
+
+    /**
+     * A real Container is required here. SlotItemHandler exposes a shared zero-sized placeholder
+     * container, which makes ClientSort validate our menu slot IDs against an invalid inventory.
+     */
+    private final class BagInventory extends SimpleContainer {
+        private BagInventory(NonNullList<ItemStack> stacks) {
+            super(BAG_SLOT_COUNT);
+            for (int slot = 0; slot < BAG_SLOT_COUNT; slot++) {
+                getItems().set(slot, stacks.get(slot).copy());
+            }
+        }
+
+        @Override
+        public boolean canPlaceItem(int slot, @NotNull ItemStack stack) {
+            return slot >= 0
+                    && slot < BAG_SLOT_COUNT
+                    && !(stack.getItem() instanceof BagItem);
         }
 
         @Override
         public void setChanged() {
-            bagInventory.markContentsChanged(index);
+            super.setChanged();
+            onBagInventoryChanged();
+        }
+
+        private NonNullList<ItemStack> stacksView() {
+            return getItems();
+        }
+    }
+
+    private static final class BagSlot extends Slot {
+        private BagSlot(BagInventory inventory, int index, int x, int y) {
+            super(inventory, index, x, y);
+        }
+
+        @Override
+        public boolean mayPlace(@NotNull ItemStack stack) {
+            return container.canPlaceItem(getContainerSlot(), stack);
         }
     }
 

@@ -125,14 +125,20 @@ configurations {
     runtimeClasspath.extendsFrom localRuntime
 }
 
+def enableClientSortDevRuntime = providers.gradleProperty('enable_clientsort_dev_runtime')
+        .map(String::toBoolean)
+        .orElse(true)
+
 dependencies {
     // Optional ClientSort development integration. compileOnly makes its API available while
     // compiling, and localRuntime loads it in development runs without publishing it as a
     // dependency of Ender Bags. ClientSort's NeoForge build requires Cloth Config at runtime.
     compileOnly "maven.modrinth:${clientsort_modrinth_project}:${clientsort_modrinth_version}"
-    localRuntime "maven.modrinth:${clientsort_modrinth_project}:${clientsort_modrinth_version}"
     compileOnly "maven.modrinth:${cloth_config_modrinth_project}:${cloth_config_modrinth_version}"
-    localRuntime "maven.modrinth:${cloth_config_modrinth_project}:${cloth_config_modrinth_version}"
+    if (enableClientSortDevRuntime.get()) {
+        localRuntime "maven.modrinth:${clientsort_modrinth_project}:${clientsort_modrinth_version}"
+        localRuntime "maven.modrinth:${cloth_config_modrinth_project}:${cloth_config_modrinth_version}"
+    }
 
     // Optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

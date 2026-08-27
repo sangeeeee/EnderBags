@@ -22,6 +22,8 @@ This project targets Minecraft 1.21.1 with NeoForge.
   slot mutation. Invalid or conflicting legacy data is preserved instead of silently cleaned.
 - Existing bag contents and colors from the Minecraft 1.20.1 version are migrated
   to Minecraft 1.21 data components when the bag is first used.
+- Optional ClientSort integration provides its container-side buttons and keyboard operations
+  in the Ender Bag screen. Multi-slot accelerated operations are persisted as one transaction.
 
 ## Development
 
@@ -29,6 +31,8 @@ Run `gradlew.bat build` on Windows or `./gradlew build` on Linux and macOS.
 
 ClientSort and Cloth Config are downloaded as optional development dependencies and loaded
 by local run configurations. They are not required by the published Ender Bags mod.
+Set `-Penable_clientsort_dev_runtime=false` to run the development environment without them
+when checking the optional-dependency boundary.
 
 ## License
 

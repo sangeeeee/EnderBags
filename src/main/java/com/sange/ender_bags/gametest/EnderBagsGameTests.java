@@ -14,6 +14,8 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -30,6 +32,7 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.fml.ModList;
 
 @GameTestHolder(EnderBags.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -148,6 +151,60 @@ public final class EnderBagsGameTests {
                 closeMenu.getCarried().isEmpty() && countItem(mockPlayer, Items.EMERALD) == 7,
                 "Closing the menu lost its server-side cursor stack");
 
+        // ClientSort validates slots through Slot.container. It also brackets accelerated
+        // multi-slot operations with suppress/resumeRemoteUpdates, which we use as an atomic
+        // persistence boundary instead of saving a temporary duplicate/missing-item state.
+        ItemStack transactionBag = ModItems.ENDER_BAG.toStack();
+        NonNullList<ItemStack> transactionContents =
+                NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY);
+        transactionContents.set(0, new ItemStack(Items.DIAMOND, 13));
+        transactionContents.set(1, new ItemStack(Items.EMERALD, 7));
+        helper.assertTrue(
+                BagContents.save(transactionBag, transactionContents),
+                "Could not prepare the ClientSort transaction test bag");
+        mockPlayer.getInventory().setItem(0, transactionBag);
+        EnderBagMenu transactionMenu =
+                new EnderBagMenu(4, mockPlayer.getInventory(), 0, transactionBag);
+        helper.assertTrue(
+                transactionMenu.getSlot(0).container == transactionMenu.getSlot(1).container
+                        && transactionMenu.getSlot(0).container.getContainerSize()
+                                == BagContents.SLOT_COUNT
+                        && transactionMenu.getSlot(0).getContainerSlot() == 0
+                        && transactionMenu.getSlot(BagContents.SLOT_COUNT - 1)
+                                        .getContainerSlot()
+                                == BagContents.SLOT_COUNT - 1,
+                "Ender Bag slots do not expose a valid container layout to ClientSort");
+        helper.assertTrue(
+                transactionMenu.getSlot(0)
+                                .container
+                                .canPlaceItem(0, Items.LIGHT.getDefaultInstance())
+                        && !transactionMenu.getSlot(0).mayPlace(emptyBag),
+                "Ender Bag slot validation is incompatible with ClientSort or permits nesting");
+
+        ItemStack first = transactionMenu.getSlot(0).getItem().copy();
+        ItemStack second = transactionMenu.getSlot(1).getItem().copy();
+        transactionMenu.suppressRemoteUpdates();
+        transactionMenu.getSlot(0).setByPlayer(second);
+        NonNullList<ItemStack> duringTransaction =
+                requireContents(transactionBag, level, helper);
+        helper.assertTrue(
+                duringTransaction.get(0).is(Items.DIAMOND)
+                        && duringTransaction.get(0).getCount() == 13
+                        && duringTransaction.get(1).is(Items.EMERALD)
+                        && duringTransaction.get(1).getCount() == 7,
+                "A partial ClientSort transaction was persisted to the held bag");
+        transactionMenu.getSlot(1).setByPlayer(first);
+        transactionMenu.resumeRemoteUpdates();
+        NonNullList<ItemStack> afterTransaction =
+                requireContents(transactionBag, level, helper);
+        helper.assertTrue(
+                afterTransaction.get(0).is(Items.EMERALD)
+                        && afterTransaction.get(0).getCount() == 7
+                        && afterTransaction.get(1).is(Items.DIAMOND)
+                        && afterTransaction.get(1).getCount() == 13,
+                "The completed ClientSort transaction was not committed atomically");
+        transactionMenu.removed(mockPlayer);
+
         DyeBagRecipe dyeRecipe = new DyeBagRecipe(CraftingBookCategory.MISC);
         CraftingInput dyeInput = CraftingInput.of(
                 2,
@@ -256,6 +313,92 @@ public final class EnderBagsGameTests {
                 "Hidden overflow data was silently overwritten");
 
         helper.succeed();
+    }
+
+    @GameTest(
+            template = "empty",
+            timeoutTicks = 40)
+    public static void clientSortAcceleratedSorting(GameTestHelper helper) {
+        if (!ModList.get().isLoaded("clientsort")) {
+            helper.succeed();
+            return;
+        }
+
+        var level = helper.getLevel();
+        @SuppressWarnings("removal")
+        ServerPlayer player = (ServerPlayer) helper.makeMockServerPlayerInLevel();
+        player.getInventory().selected = 0;
+
+        ItemStack bag = ModItems.ENDER_BAG.toStack();
+        NonNullList<ItemStack> contents =
+                NonNullList.withSize(BagContents.SLOT_COUNT, ItemStack.EMPTY);
+        contents.set(0, new ItemStack(Items.DIAMOND, 13));
+        contents.set(1, new ItemStack(Items.EMERALD, 7));
+        helper.assertTrue(BagContents.save(bag, contents), "Could not prepare ClientSort test data");
+        player.getInventory().setItem(0, bag);
+
+        EnderBagMenu menu = new EnderBagMenu(6, player.getInventory(), 0, bag);
+        player.containerMenu = menu;
+
+        int[] allBagSlots = new int[BagContents.SLOT_COUNT];
+        for (int slot = 0; slot < allBagSlots.length; slot++) {
+            allBagSlots[slot] = slot;
+        }
+
+        // ClientSort performs COLLECT before SORT. The full slot array includes empty slots and
+        // reproduces the old zero-sized SlotItemHandler container crash.
+        invokeClientSortHandler(
+                "Collect",
+                new Class<?>[] {int.class, int[].class, String.class},
+                new Object[] {menu.containerId, allBagSlots, "ender-bags-gametest"},
+                player);
+
+        helper.runAfterDelay(2, () -> {
+            invokeClientSortHandler(
+                    "Sort",
+                    new Class<?>[] {int.class, int[].class},
+                    new Object[] {menu.containerId, new int[] {0, 1, 1, 0}},
+                    player);
+
+            helper.runAfterDelay(2, () -> {
+                NonNullList<ItemStack> sorted = requireContents(bag, level, helper);
+                helper.assertTrue(
+                        sorted.get(0).is(Items.EMERALD)
+                                && sorted.get(0).getCount() == 7
+                                && sorted.get(1).is(Items.DIAMOND)
+                                && sorted.get(1).getCount() == 13,
+                        "ClientSort's accelerated COLLECT/SORT operation failed or lost items");
+                menu.removed(player);
+                helper.succeed();
+            });
+        });
+    }
+
+    private static void invokeClientSortHandler(
+            String operation,
+            Class<?>[] constructorParameterTypes,
+            Object[] constructorArguments,
+            ServerPlayer player) {
+        try {
+            Class<?> payloadClass = Class.forName(
+                    "dev.terminalmc.clientsort.network.payload." + operation + "Payload");
+            Object payload = payloadClass
+                    .getConstructor(constructorParameterTypes)
+                    .newInstance(constructorArguments);
+            Class<?> handlerClass = Class.forName(
+                    "dev.terminalmc.clientsort.network.handler." + operation + "Handler");
+            handlerClass
+                    .getMethod(
+                            "handle",
+                            payloadClass,
+                            MinecraftServer.class,
+                            ServerPlayer.class)
+                    .invoke(null, payload, player.getServer(), player);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(
+                    "Could not invoke ClientSort " + operation + " compatibility test",
+                    exception);
+        }
     }
 
     private static void testWoolRecipes(
