@@ -1,0 +1,13 @@
+{
+  "itemGroup.ender_bags": "Ender Bags Tab",
+  "block.ender_bags.ender_bags_block": "Ender Bags Block",
+  "item.ender_bags.ender_bags_item": "Ender Bags Item",
+
+  "ender_bags.configuration.title": "Ender Bags Continue Configs",
+  "ender_bags.configuration.section.ender_bags.common.toml": "Ender Bags Continue Configs",
+  "ender_bags.configuration.section.ender_bags.common.toml.title": "Ender Bags Continue Configs",
+  "ender_bags.configuration.items": "Item List",
+  "ender_bags.configuration.logDirtBlock": "Log Dirt Block",
+  "ender_bags.configuration.magicNumberIntroduction": "Magic Number Text",
+  "ender_bags.configuration.magicNumber": "Magic Number"
+}
